@@ -1,0 +1,139 @@
+OpenLDAP is an opensource implementation of Lightweight Directory Access Protocal. Read more about OpenLDAP Project. I am using CentOS 5 for configuring OpenLDAP server. Below are the steps which I have performed during configuration. This article will help you step by step to Install and Configure OpenLDAP Server.
+
+Network Details: Below is the network details used while writing this article.
+
+System name: openldap.example.com
+System IP: 192.168.10.50
+Domain Name: example.com
+Step 1: Create Test Accounts
+Firsty create two test user accounts in your linux system using following commnands.
+
+# useradd ldapuser1
+# useradd ldapuser2
+# passwd ldapuser1
+# passwd ldapuser2
+Step 2: Install Requird Packages
+Below is list of software required for setup openldap
+
+compat-openldap
+openldap-clients
+openldap-devel
+openldap-servers
+openldap-servers-sql
+Install all packages using following command.
+
+# yum install *openldap* -y
+Step 3: Setup OpenLDAP root Password
+After installing openldap packages, First create OpenLDAP root user password
+
+# slappasswd
+
+New password:
+Re-enter new password:
+{SSHA}BONOBgJZNZc3A+UFq3fcjRn2YHsZVkXw
+Step 4:Edit Configuration File
+Edit openldap configuration file with new values , use rootpw value get from slappasswd command in above step
+
+# vi /etc/openldap/slapd.conf
+database bdb
+suffix "dc=example,dc=com"
+rootdn "cn=Manager,dc=example,dc=com"
+rootpw {SSHA}BONOBgJZNZc3A+UFq3fcjRn2YHsZVkXw
+Step 5:Setup LDAP Database File
+Copye example LDAP database file at below location. Use given example file from openldap
+
+# cp /etc/openldap/DB_CONFIG.example /var/lib/ldap/DB_CONFIG
+Step 6 Start Services
+Start openldap service and setup service to auto start on system boot
+
+# service ldap start
+# chkconfig ldap on
+Step 7: Create Domain LDIF File
+Now Create ldif (LDAP Data Interchange Format) file for your domain example.com, You can use any filename with extension ldif
+
+# vim /etc/openldap/base.ldif
+dn: dc=example,dc=com
+dc: example
+objectClass: top
+objectClass: domain
+dn: ou=users,dc=example,dc=com
+ou: users
+objectClass: top
+objectClass: organizationalUnit
+dn: ou=Group,dc=example,dc=com
+ou: Group
+objectClass: top
+objectClass: organizationalUnit
+Step 8: Create Users LDIF File
+After creating ldif file for your domain, Let create ldif file for all test users.
+
+# cd /usr/share/openldap/migration/
+# grep root /etc/passwd > /etc/openldap/passwd.root
+# grep ldapuser1 /etc/passwd > /etc/openldap/passwd.ldapuser1
+# grep ldapuser2 /etc/passwd > /etc/openldap/passwd.ldapuser2
+# ./migrate_passwd.pl /etc/openldap/passwd.root /etc/openldap/root.ldif
+# ./migrate_passwd.pl /etc/openldap/passwd.ldapuser1 /etc/openldap/ldapuser1.ldif
+# ./migrate_passwd.pl /etc/openldap/passwd.ldapuser1 /etc/openldap/ldapuser2.ldif
+Step 9: Edit Users LDIF Files
+Modify all LDIF files created for users as per below given example for ldapuser1.
+
+# vim /etc/openldap/ldapuser1.ldif
+dn: uid=ldapuser1,dc=example,dc=com
+uid: ldapuser1
+cn: ldapuser1
+objectClass: account
+objectClass: posixAccount
+objectClass: top
+objectClass: shadowAccount
+objectClass: radiusprofile
+description: 802.1x user
+radiusFilterId: "Enterasys:version=1:policy=Enterprise User"
+userPassword: {crypt}$1$rN6WLraT$9skdu7BpRUM6v7DiEhQXt1
+shadowLastChange: 15419
+shadowMin: 0
+shadowMax: 99999
+shadowWarning: 7
+loginShell: /bin/bash
+uidNumber: 612
+gidNumber: 612
+homeDirectory: /home/ldapuser1
+Note: Make sure you have added below 3 file in ldif for integrating radius-ldap authentication
+
+objectClass: radiusprofile
+description: 802.1x user
+radiusFilterId: “Enterasys:version=1:policy=Enterprise User”
+Step 10: Import All Data
+Import all Data from configuration files to LDAP database
+Importing base.ldif:
+
+# ldapadd -x -D "cn=Manager,dc=example,dc=com" -W -f /etc/openldap/base.ldif
+Enter LDAP Password:
+adding new entry "dc=example,dc=com"
+adding new entry "ou=users,dc=example,dc=com"
+adding new entry "ou=Group,dc=example,dc=com"
+Importing root.ldif:
+
+# ldapadd -x -D "cn=Manager,dc=example,dc=com" -W -f /etc/openldap/root.ldif
+Enter LDAP Password:
+adding new entry "uid=root,ou=users,dc=example,dc=com"
+adding new entry "uid=operator,ou=users,dc=example,dc=com"
+Importing ldapuser1.ldif:
+
+# ldapadd -x -D "cn=Manager,dc=example,dc=com" -W -f /etc/openldap/ldapuser1.ldif
+Enter LDAP Password:
+adding new entry "uid=ldapuser1,ou=users,dc=example,dc=com"
+Importing ldapuser2.ldif:
+
+# ldapadd -x -D "cn=Manager,dc=example,dc=com" -W -f /etc/openldap/ldapuser2.ldif
+Enter LDAP Password:
+adding new entry "uid=ldapuser2,ou=users,dc=example,dc=com"
+Step 11: Restart LDAP Service
+Stop and Start LDAP service using following command.
+
+# /etc/init.d/ldap stop
+# /etc/init.d/ldap start
+Step 12: Test Your Setup
+You setup has been completed, Lets test your ldap server using ldapsearch
+
+# ldapsearch -x -b 'dc=example,dc=com' '(objectclass=*)'
+Congratulation’s Your ldap setup has been completed. Read our next article 
